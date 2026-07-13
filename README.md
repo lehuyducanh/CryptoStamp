@@ -37,10 +37,44 @@ node tests/run.js   # unit tests cho core thuần (mat, anim, quantize, trace, s
      hoặc bấm nút **◆** cạnh từng thuộc tính trong Thuộc tính.
    - Kéo keyframe trên timeline để đổi thời điểm; chọn key rồi đổi **Easing**.
    - Space phát/dừng; kéo thước thời gian để tua.
-5. **Xuất**: **⬇ SVG động** (CSS keyframes nhúng — mở bằng mọi trình duyệt,
-   nhúng được vào web), **SVG** khung tĩnh, hoặc **Lưu** JSON dự án.
+5. **Xuất**:
+   - **⬇ Video** → **WebM** (quay theo thời gian thực, dùng ngay) hoặc **chuỗi
+     PNG .zip** (frame-chính-xác, chất lượng cao nhất, ghép bằng ffmpeg).
+   - **⬇ SVG động** (CSS keyframes nhúng) — dành cho clip ngắn / loop ≤ 60s.
+   - **SVG** khung tĩnh, hoặc **Lưu** JSON dự án.
 
 Dự án tự động lưu vào localStorage của trình duyệt.
+
+## Làm video dài (ví dụ 5 phút)
+
+Đặt **Dài (s) = 300** là chạy được ngay (timeline có thanh **Zoom** để điều
+hướng 9.000 frame), nhưng quy trình khuyến nghị — giống studio thật — là
+**chia phim thành cảnh**:
+
+1. Mỗi cảnh 5–30 giây làm trong một file dự án riêng (**Lưu** / **Mở** JSON);
+   asset vector tái sử dụng bằng cách lưu kèm trong từng file dự án.
+2. Xuất từng cảnh:
+   - Nhanh: **⬇ Video → WebM** (phim 30s ≈ chờ 30s vì quay realtime).
+   - Chất lượng cao: **⬇ Video → PNG .zip** (tối đa ~30s/lần; phim dài hơn thì
+     xuất theo từng khoảng "từ giây … đến giây").
+3. Ghép các cảnh + nhạc bằng ffmpeg (hoặc CapCut/Premiere/DaVinci):
+
+```bash
+# PNG sequence → video từng cảnh
+unzip frames_0s-30s.zip -d canh1
+ffmpeg -framerate 30 -i canh1/frame_%04d.png -c:v libx264 -pix_fmt yuv420p canh1.mp4
+
+# Nối các cảnh thành phim 5 phút
+printf "file 'canh1.mp4'\nfile 'canh2.mp4'\nfile 'canh3.mp4'\n" > list.txt
+ffmpeg -f concat -safe 0 -i list.txt -c copy phim.mp4
+
+# Thêm nhạc nền
+ffmpeg -i phim.mp4 -i nhac.mp3 -c:v copy -c:a aac -shortest phim-final.mp4
+```
+
+Vì sao không xuất SVG động cho phim dài? File sẽ phình theo số frame lấy mẫu
+(5 phút ≈ hàng chục MB) và không đưa vào phần mềm dựng phim được — SVG động
+chỉ hợp banner/loop ngắn. WebM/PNG là định dạng đúng cho phim.
 
 ## Phím tắt
 

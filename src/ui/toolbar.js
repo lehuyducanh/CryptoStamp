@@ -6,6 +6,7 @@ import {
 import {
   saveProjectFile, openProjectFile, exportFrameSVG, exportAnimatedSVG,
 } from '../export/exporters.js';
+import { openVideoExportModal } from '../export/video.js';
 import { setZoom, fitZoom } from './canvas.js';
 import { qs } from './dom.js';
 
@@ -31,6 +32,7 @@ export function initToolbar() {
   qs('#tb-save').addEventListener('click', saveProjectFile);
   qs('#tb-exp-svg').addEventListener('click', exportFrameSVG);
   qs('#tb-exp-anim').addEventListener('click', exportAnimatedSVG);
+  qs('#tb-exp-video').addEventListener('click', openVideoExportModal);
 
   qs('#tb-zoom-in').addEventListener('click', () => setZoom(state.zoom * 1.2));
   qs('#tb-zoom-out').addEventListener('click', () => setZoom(state.zoom / 1.2));

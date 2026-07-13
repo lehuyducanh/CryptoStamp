@@ -85,7 +85,16 @@ pose-to-pose.
   lỗi mạng/key chỉ hiện toast, không chặn workflow.
 - **Xuất SVG động lấy mẫu dày (mỗi frame) làm file to?** Đúng, nhưng đúng
   tuyệt đối với mọi easing/pivot; có nén run-length các frame tĩnh. Đổi lấy
-  file mở được mọi nơi không cần runtime (khác Lottie cần player).
+  file mở được mọi nơi không cần runtime (khác Lottie cần player). Với phim
+  dài (>60s) app cảnh báo và trỏ sang xuất Video.
+- **Video dài (5 phút)?** Đã bổ sung: xuất **WebM** (MediaRecorder, quay theo
+  thời gian thực — đánh đổi: 5 phút phim = 5 phút chờ, timestamp do đồng hồ
+  thật nên không thể render nhanh hơn realtime với MediaRecorder) và **chuỗi
+  PNG .zip** (frame-chính-xác, giới hạn ~900 frame/lần vì giữ trong RAM; ghép
+  bằng ffmpeg). Timeline có zoom (0.2–20 px/frame) và thước chia vạch thích
+  ứng nên 9.000 frame vẫn điều hướng tốt (đo: rebuild ~1ms). Quy trình khuyến
+  nghị vẫn là chia cảnh 5–30s/file rồi ghép — WebCodecs + muxer để render
+  nhanh-hơn-realtime nằm ở roadmap.
 - **Animate được prop nào?** Chỉ transform + opacity. Path morphing là bài
   toán khác hẳn (tương ứng điểm) — roadmap, không nhồi vào v1.
 
@@ -99,5 +108,6 @@ pose-to-pose.
 
 ## 5. Roadmap sau v1
 
-IK 2 khớp · onion skin · path morphing · xuất Lottie JSON · xuất WebM ·
-bảo toàn world-transform khi reparent · curve editor cho easing.
+IK 2 khớp · onion skin · path morphing · xuất Lottie JSON · render video
+nhanh-hơn-realtime (WebCodecs + webm muxer) · trình quản lý cảnh trong một
+file dự án · bảo toàn world-transform khi reparent · curve editor cho easing.

@@ -10,7 +10,7 @@ const TL_LABEL_W = 170;
 const TL_PROP_LABELS = {
   x: 'X', y: 'Y', rotation: 'Xoay', scaleX: 'Tỉ lệ X', scaleY: 'Tỉ lệ Y', opacity: 'Mờ',
 };
-let tlScroll, tlPpf = 8, tlKeyDrag = null, tlScrub = null;
+let tlScroll, tlPpf = 8, tlKeyDrag = null, tlScrub = null, tlZoomExp = 0;
 
 export function initTimeline() {
   tlScroll = document.getElementById('tl-scroll');
@@ -37,6 +37,9 @@ export function initTimeline() {
     state.autokey = !state.autokey;
     e.currentTarget.classList.toggle('active', state.autokey);
   });
+
+  const zoomInp = document.getElementById('tl-zoomx');
+  zoomInp.addEventListener('input', () => { tlZoomExp = +zoomInp.value; tlRebuild(); });
 
   const fpsInp = document.getElementById('tl-fps');
   const durInp = document.getElementById('tl-dur');
@@ -76,9 +79,18 @@ function tlSyncInputs() {
   document.getElementById('tl-dur').value = +(state.project.durFrames / state.project.fps).toFixed(2);
 }
 
+// ppf cơ sở = vừa khít panel; tlZoomExp (thanh Zoom) nhân theo lũy thừa 2,
+// cho phép đi xuống 0.2px/frame để phim dài (9000 frame) vẫn điều hướng được.
 function tlComputePpf() {
   const avail = tlScroll.clientWidth - TL_LABEL_W - 24;
-  return Math.max(3, Math.min(16, avail / state.project.durFrames));
+  const fit = Math.max(0.2, avail / state.project.durFrames);
+  return Math.max(0.2, Math.min(20, fit * Math.pow(2, tlZoomExp)));
+}
+
+function tlFormatTime(sec) {
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
 }
 
 function tlRebuild() {
@@ -86,10 +98,12 @@ function tlRebuild() {
   tlPpf = tlComputePpf();
   const laneW = p.durFrames * tlPpf;
 
-  // Ruler với vạch giây
+  // Ruler: chọn bước vạch (giây) sao cho nhãn cách nhau ≥ 70px
+  const secPx = p.fps * tlPpf;
+  const stepS = [1, 2, 5, 10, 15, 30, 60, 120].find((s) => s * secPx >= 70) || 300;
   let ticks = '';
-  for (let f = 0; f <= p.durFrames; f += p.fps) {
-    ticks += `<div class="tl-tick" style="left:${f * tlPpf}px">${(f / p.fps).toFixed(0)}s</div>`;
+  for (let f = 0; f <= p.durFrames; f += stepS * p.fps) {
+    ticks += `<div class="tl-tick" style="left:${f * tlPpf}px">${tlFormatTime(f / p.fps)}</div>`;
   }
   let html = `<div class="tl-row tl-ruler-row">
     <div class="tl-label">Thời gian</div>

@@ -86,6 +86,18 @@ const result = await page.evaluate(async () => {
   if (after >= before) throw new Error('undo không giảm node');
   A.redo?.();
 
+  // 5. Xuất video: WebM ngắn (0.8s) + chuỗi PNG zip
+  A.state.project.durFrames = 24;
+  const webm = await A.recordWebMBlob({});
+  if (webm.size < 1000) throw new Error('WebM quá nhỏ: ' + webm.size);
+  const zip = await A.recordPNGZipBlob({ fromF: 0, toF: 5 });
+  const zipBytes = new Uint8Array(await zip.arrayBuffer());
+  let zipB64 = '';
+  for (let i = 0; i < zipBytes.length; i += 0x8000) {
+    zipB64 += String.fromCharCode(...zipBytes.subarray(i, i + 0x8000));
+  }
+  zipB64 = btoa(zipB64);
+
   A.setFrame(12);
   return {
     nodes: A.state.project.nodes.length,
@@ -93,8 +105,24 @@ const result = await page.evaluate(async () => {
     pieces: res.items.length,
     svgLen: svg.length,
     animLen: anim.length,
+    webmSize: webm.size,
+    zipB64,
   };
 });
+
+// Kiểm tra file zip hợp lệ bằng Python zipfile
+{
+  const { writeFile } = await import('node:fs/promises');
+  const { execFileSync } = await import('node:child_process');
+  const zipPath = '/tmp/vm-smoke-frames.zip';
+  await writeFile(zipPath, Buffer.from(result.zipB64, 'base64'));
+  const check = execFileSync('python3', ['-c',
+    `import zipfile; z=zipfile.ZipFile('${zipPath}'); bad=z.testzip(); print(len(z.namelist()), bad)`,
+  ]).toString().trim();
+  if (!check.startsWith('6 None')) throw new Error('ZIP không hợp lệ: ' + check);
+  delete result.zipB64;
+  result.zipFrames = 6;
+}
 
 await page.waitForTimeout(300);
 if (shotPath) await page.screenshot({ path: shotPath });

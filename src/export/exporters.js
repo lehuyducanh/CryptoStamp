@@ -75,6 +75,10 @@ export function animatedSVGString() {
 }
 
 export function exportAnimatedSVG() {
+  const p = state.project;
+  if (p.durFrames / p.fps > 60) {
+    showToast('Dự án dài hơn 60s: SVG động sẽ rất nặng — nên dùng ⬇ Video (WebM/PNG) cho phim dài.', true);
+  }
   const svg = animatedSVGString();
   if (!svg) {
     showToast('Chưa có keyframe nào để xuất animation', true);

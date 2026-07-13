@@ -16,6 +16,7 @@ import { AI_PROVIDERS } from './ai/providers.js';
 import { vectorizeImageData, imageToImageData } from './vector/vectorize.js';
 import { projectSVG } from './core/markup.js';
 import { animatedSVGString } from './export/exporters.js';
+import { recordWebMBlob, recordPNGZipBlob } from './export/video.js';
 import { loadImage } from './ui/dom.js';
 
 function boot() {
@@ -42,6 +43,7 @@ function boot() {
     deleteNodes, undo, redo, togglePlay,
     AI_PROVIDERS, loadImage, imageToImageData, vectorizeImageData,
     addTraceResult, projectSVG, animatedSVGString,
+    recordWebMBlob, recordPNGZipBlob,
   };
 }
 

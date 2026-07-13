@@ -12,6 +12,7 @@ import {
   state, newProject, makeNode, addNode, setProps, setFrame, findNode,
   undo, setPivot, groupSelection, setSelection,
 } from '../src/core/state.js';
+import { crc32, zipStore } from '../src/export/zip.js';
 
 let pass = 0, fail = 0;
 function ok(cond, msg) {
@@ -176,6 +177,23 @@ function close(a, b, eps, msg) { ok(Math.abs(a - b) <= (eps ?? 1e-6), `${msg} ($
   const back = JSON.parse(json);
   ok(back.nodes.length === state.project.nodes.length
     && back.tracks.length === state.project.tracks.length, 'serialize roundtrip');
+}
+
+// ---- zip / crc32 ----
+{
+  const enc = new TextEncoder();
+  ok(crc32(new Uint8Array(0)) === 0, 'crc32 rỗng = 0');
+  ok(crc32(enc.encode('123456789')) === 0xcbf43926, 'crc32 chuẩn "123456789"');
+  const blob = zipStore([
+    { name: 'a.txt', data: enc.encode('hello') },
+    { name: 'b/c.txt', data: enc.encode('vecmotion') },
+  ]);
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  ok(buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 3 && buf[3] === 4, 'zip: local header PK\\3\\4');
+  const tail = buf.slice(-22);
+  ok(tail[0] === 0x50 && tail[1] === 0x4b && tail[2] === 5 && tail[3] === 6, 'zip: end-of-central-dir');
+  const view = new DataView(tail.buffer, tail.byteOffset);
+  ok(view.getUint16(8, true) === 2, 'zip: đếm 2 entry');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -26,7 +26,8 @@
       <button id="tb-open">Mở</button>
       <button id="tb-save">Lưu</button>
       <button id="tb-exp-svg" title="Xuất SVG khung hình hiện tại">SVG</button>
-      <button id="tb-exp-anim" class="primary" title="Xuất SVG động (CSS keyframes)">⬇ SVG động</button>
+      <button id="tb-exp-anim" title="Xuất SVG động (CSS keyframes) — hợp clip ngắn/loop">⬇ SVG động</button>
+      <button id="tb-exp-video" class="primary" title="Xuất WebM hoặc chuỗi PNG — dùng cho video dài">⬇ Video</button>
     </div>
     <div class="tgroup">
       <button id="tb-zoom-out">−</button>
@@ -93,6 +94,7 @@
       <label>Easing <select id="tl-ease"></select></label>
       <label>FPS <input id="tl-fps" type="number" min="1" max="60"></label>
       <label>Dài (s) <input id="tl-dur" type="number" min="0.5" step="0.5"></label>
+      <label>Zoom <input id="tl-zoomx" type="range" min="-2" max="4" step="0.25" value="0" style="width:90px"></label>
     </div>
     <div id="tl-scroll"></div>
   </footer>
