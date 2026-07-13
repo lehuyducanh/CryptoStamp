@@ -3,11 +3,14 @@
 import {
   state, on, emit, findNode, findParent, walkNodes, setSelection, setProps,
   snapshot, worldMatrix, nodeLocalBBox, makeNode, addNode, setPivot, setTool,
+  writeMorphKey,
 } from '../core/state.js';
 import {
   nodeMatrix, matToSvg, matInvert, matApply, matApplyVec, matIdentity,
 } from '../core/mat.js';
 import { nodeInnerSVG } from '../core/markup.js';
+import { parsePathD, buildPathD, pathAnchorIdx, moveAnchor } from '../vector/path.js';
+import { geoTrackIds } from '../core/eval.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 let cvSvg, cvContent, cvOverlay, cvBgRect, cvScroll;
@@ -43,8 +46,9 @@ export function initCanvas() {
   on('change:project', () => { cvResizeStage(); cvRebuild(); cvDrawOverlay(); });
   on('change:structure', () => { cvRebuild(); cvDrawOverlay(); });
   on('change:props', () => { cvUpdateTransforms(); cvDrawOverlay(); });
-  on('change:frame', () => { cvUpdateTransforms(); cvDrawOverlay(); });
+  on('change:frame', () => { cvUpdateTransforms(); cvGeoRefresh(); cvDrawOverlay(); });
   on('change:selection', cvDrawOverlay);
+  on('change:tool', cvDrawOverlay);
 
   cvResizeStage();
   cvRebuild();
@@ -112,6 +116,11 @@ export function refreshNodeInner(id) {
   if (n && el && n.type !== 'group') el.innerHTML = nodeInnerSVG(n);
 }
 
+// Vẽ lại nội dung các node có track hình học (morph, w/h) sau khi tua frame
+function cvGeoRefresh() {
+  for (const id of geoTrackIds(state.project)) refreshNodeInner(id);
+}
+
 function cvStagePoint(ev) {
   const r = cvSvg.getBoundingClientRect();
   return {
@@ -156,6 +165,29 @@ function cvDown(ev) {
     setSelection([n.id]);
     cvDrag = { kind: 'draw', id: n.id, sx: pt.x, sy: pt.y };
     cvSvg.setPointerCapture(ev.pointerId);
+    return;
+  }
+
+  // Công cụ Sửa điểm: kéo đỉnh path của node vector đang chọn
+  if (state.tool === 'points') {
+    const vp = ev.target.closest('[data-vp]');
+    if (vp && state.selection.length === 1) {
+      const id = state.selection[0];
+      const n = findNode(id);
+      snapshot();
+      const [pi, ai] = vp.getAttribute('data-vp').split(':').map(Number);
+      const geos = n.paths.map((p) => parsePathD(p.d));
+      cvDrag = {
+        kind: 'vpoint', id, pi, ai, geos,
+        orig: geos.map((g) => g.pts.slice()), startPt: pt,
+      };
+      cvSvg.setPointerCapture(ev.pointerId);
+      return;
+    }
+    // click node khác → chỉ chọn, không kéo
+    const g2 = ev.target.closest('g[data-id]');
+    if (g2 && cvContent.contains(g2)) { setSelection([g2.getAttribute('data-id')]); return; }
+    setSelection([]);
     return;
   }
 
@@ -247,11 +279,31 @@ function cvMove(ev) {
       });
       break;
     }
+    case 'vpoint': {
+      const n = findNode(cvDrag.id);
+      if (!n) break;
+      const inv = matInvert(worldMatrix(cvDrag.id));
+      const d = matApplyVec(inv, {
+        x: pt.x - cvDrag.startPt.x, y: pt.y - cvDrag.startPt.y,
+      });
+      const g = cvDrag.geos[cvDrag.pi];
+      g.pts = cvDrag.orig[cvDrag.pi].slice();
+      moveAnchor(g.cmds, g.pts, cvDrag.ai, d.x, d.y);
+      n.paths[cvDrag.pi].d = buildPathD(g.cmds, g.pts);
+      refreshNodeInner(n.id);
+      cvDrawOverlay();
+      break;
+    }
   }
 }
 
 function cvUp(ev) {
   if (!cvDrag) return;
+  if (cvDrag.kind === 'vpoint') {
+    // Ghi key morph nếu autokey bật hoặc node đã có track morph
+    writeMorphKey(cvDrag.id);
+    emit('change:props');
+  }
   if (cvDrag.kind === 'draw') {
     const n = findNode(cvDrag.id);
     if (n) {
@@ -286,6 +338,23 @@ function cvDrawOverlay() {
       class: 'sel-outline', 'stroke-width': sw,
     }));
     if (state.selection.length !== 1) continue;
+
+    // Chế độ Sửa điểm: hiện các đỉnh path kéo được thay cho handle transform
+    if (state.tool === 'points') {
+      if (n.type !== 'vector') continue;
+      const pr2 = 4.5 / z;
+      n.paths.forEach((p, pi) => {
+        const g = parsePathD(p.d);
+        for (const ai of pathAnchorIdx(g.cmds)) {
+          const wpt = matApply(W, { x: g.pts[ai], y: g.pts[ai + 1] });
+          cvOverlay.append(cvMakeEl('circle', {
+            cx: wpt.x, cy: wpt.y, r: pr2,
+            class: 'vp-handle', 'data-vp': `${pi}:${ai}`, 'stroke-width': sw,
+          }));
+        }
+      });
+      continue;
+    }
 
     // Handle scale ở 4 góc
     const hs = 9 / z;

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Ứng dụng motion/hoạt hình 2D: AI tạo element → vector hóa → rig → keyframe → xuất SVG động",
   "type": "module",
+  "bin": { "vecmotion": "./bin/vecmotion.mjs" },
   "scripts": {
     "start": "python3 -m http.server 8000",
     "test": "node tests/run.js",

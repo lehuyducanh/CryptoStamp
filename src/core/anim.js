@@ -33,7 +33,8 @@ export function sortKeys(track) {
   track.keys.sort((a, b) => a.t - b.t);
 }
 
-// Giá trị của track tại frame f (f có thể là số thực khi đang phát)
+// Giá trị của track tại frame f (f có thể là số thực khi đang phát).
+// Giá trị key là số (transform, w/h) hoặc mảng số (morph — tọa độ đỉnh).
 export function evalTrack(track, f) {
   const ks = track.keys;
   if (!ks.length) return undefined;
@@ -45,5 +46,11 @@ export function evalTrack(track, f) {
   if (k0.e === 'hold') return k0.v;
   const u = (f - k0.t) / (k1.t - k0.t);
   const ease = EASINGS[k0.e] || EASINGS.linear;
+  if (Array.isArray(k0.v)) {
+    // Morph: nội suy từng phần tử; topology khác nhau → giữ key trước
+    if (!Array.isArray(k1.v) || k1.v.length !== k0.v.length) return k0.v;
+    const e = ease(u);
+    return k0.v.map((a, idx) => a + (k1.v[idx] - a) * e);
+  }
   return k0.v + (k1.v - k0.v) * ease(u);
 }

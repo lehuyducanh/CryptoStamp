@@ -9,8 +9,16 @@ import { refreshNodeInner } from './canvas.js';
 
 const INS_LABELS = {
   x: 'X', y: 'Y', rotation: 'Xoay °', scaleX: 'Tỉ lệ X', scaleY: 'Tỉ lệ Y', opacity: 'Mờ',
+  w: 'Rộng', h: 'Cao',
 };
-const INS_STEPS = { x: 1, y: 1, rotation: 1, scaleX: 0.05, scaleY: 0.05, opacity: 0.05 };
+const INS_STEPS = {
+  x: 1, y: 1, rotation: 1, scaleX: 0.05, scaleY: 0.05, opacity: 0.05, w: 1, h: 1,
+};
+
+// Danh sách prop hiện trong panel: transform + w/h nếu node có kích thước
+function insPropsFor(n) {
+  return (n.type === 'shape' || n.type === 'image') ? [...ANIM_PROPS, 'w', 'h'] : ANIM_PROPS;
+}
 let insBox;
 
 export function initInspector() {
@@ -74,10 +82,15 @@ function insRender() {
     </div></div>`;
 
   html += `<div class="ins-section"><h4>Transform <span class="hint-inline">◆ = keyframe tại frame hiện tại</span></h4>`;
-  for (const p of ANIM_PROPS) {
+  for (const p of insPropsFor(n)) {
     html += `<div class="prop-row"><label>${INS_LABELS[p]}</label>
       <input type="number" step="${INS_STEPS[p]}" data-prop="${p}" value="${+(+n[p]).toFixed(3)}">
       <button class="${insKeyBtnClass(n.id, p)}" data-key="${p}" title="Bật/tắt keyframe">◆</button></div>`;
+  }
+  if (n.type === 'vector') {
+    html += `<div class="prop-row"><label>Hình dạng</label>
+      <span class="ins-type" style="flex:1" title="Kéo đỉnh bằng công cụ ✎ (phím A), key tự ghi khi ● Ghi key bật">✎ sửa điểm (A)</span>
+      <button class="${insKeyBtnClass(n.id, 'morph')}" data-key="morph" title="Keyframe hình dạng (morph)">◆</button></div>`;
   }
   html += `</div>`;
 
@@ -118,7 +131,7 @@ function insSyncValues() {
   if (state.selection.length !== 1) return;
   const n = findNode(state.selection[0]);
   if (!n) return;
-  for (const p of ANIM_PROPS) {
+  for (const p of [...insPropsFor(n), 'morph']) {
     const inp = insBox.querySelector(`input[data-prop="${p}"]`);
     if (inp && document.activeElement !== inp) inp.value = +(+n[p]).toFixed(3);
     const btn = insBox.querySelector(`button[data-key="${p}"]`);
@@ -145,8 +158,12 @@ function insOnInput(ev) {
   if (!n) return;
 
   if (t.hasAttribute('data-prop')) {
-    const v = parseFloat(t.value);
-    if (!Number.isNaN(v)) setProps(id, { [t.getAttribute('data-prop')]: v });
+    const p = t.getAttribute('data-prop');
+    let v = parseFloat(t.value);
+    if (Number.isNaN(v)) return;
+    if (p === 'w' || p === 'h') v = Math.max(1, v);
+    setProps(id, { [p]: v });
+    if (p === 'w' || p === 'h') refreshNodeInner(id); // kích thước nằm trong markup
     return;
   }
   if (t.hasAttribute('data-pivot')) {

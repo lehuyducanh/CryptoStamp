@@ -116,6 +116,8 @@ body.pivot-mode #stage { cursor: crosshair; }
 .sel-handle { fill: #fff; stroke: var(--accent); cursor: nwse-resize; }
 .sel-handle.rotate { cursor: grab; fill: var(--accent); }
 .pivot-marker { stroke: var(--accent-2); fill: none; pointer-events: none; }
+.vp-handle { fill: #fff; stroke: var(--accent-2); cursor: move; }
+.vp-handle:hover { fill: var(--accent-2); }
 
 /* ---- Layers ---- */
 #layers-panel { flex: 1 1 45%; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--border); }

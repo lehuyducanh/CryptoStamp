@@ -1,8 +1,9 @@
 // Store trung tâm: project, scene graph, tracks, selection, undo/redo, event bus.
 // Thuần logic (không DOM) để test được bằng Node.
 
-import { evalTrack, sortKeys } from './anim.js';
+import { sortKeys } from './anim.js';
 import { matIdentity, matMul, matApply, matInvert, nodeMatrix } from './mat.js';
+import { evalProjectAtFrame, geometryFlat } from './eval.js';
 
 // ---- Event bus ----
 const _listeners = {};
@@ -194,11 +195,7 @@ export function setFrame(f) {
   emit('change:frame'); emit('change:props');
 }
 export function applyTracks() {
-  for (const tr of state.project.tracks) {
-    if (!tr.keys.length) continue;
-    const n = findNode(tr.nodeId);
-    if (n) n[tr.prop] = evalTrack(tr, state.frame);
-  }
+  evalProjectAtFrame(state.project, state.frame);
 }
 
 // ---- Tracks / keyframes ----
@@ -232,14 +229,29 @@ export function toggleKey(nodeId, prop) {
   const f = Math.round(state.frame);
   const tr = getTrack(nodeId, prop);
   if (tr && tr.keys.some((k) => k.t === f)) removeKeyAt(tr, f);
-  else upsertKey(ensureTrack(nodeId, prop), f, n[prop]);
+  else {
+    const val = prop === 'morph' ? geometryFlat(n) : n[prop];
+    upsertKey(ensureTrack(nodeId, prop), f, val);
+  }
   emit('change:tracks');
+}
+
+// Ghi key morph (hình dạng hiện tại) nếu autokey bật hoặc đã có track morph
+export function writeMorphKey(nodeId) {
+  const n = findNode(nodeId);
+  if (!n || n.type !== 'vector') return false;
+  const tr = getTrack(nodeId, 'morph');
+  if (!tr && !state.autokey) return false;
+  upsertKey(tr || ensureTrack(nodeId, 'morph'), Math.round(state.frame), geometryFlat(n));
+  emit('change:tracks');
+  return true;
 }
 export function removeNodeTracks(nodeId) {
   state.project.tracks = state.project.tracks.filter((t) => t.nodeId !== nodeId);
 }
 
 // Đặt thuộc tính khi chỉnh sửa. Tự ghi key nếu prop đã có track hoặc autokey bật.
+// Keyable: transform + opacity + w/h (kích thước shape/ảnh).
 export function setProps(id, patch) {
   const n = findNode(id);
   if (!n) return;
@@ -247,7 +259,7 @@ export function setProps(id, patch) {
   const f = Math.round(state.frame);
   for (const [p, v] of Object.entries(patch)) {
     n[p] = v;
-    if (ANIM_PROPS.includes(p)) {
+    if (ANIM_PROPS.includes(p) || p === 'w' || p === 'h') {
       const tr = getTrack(id, p);
       if (tr || state.autokey) {
         if (upsertKey(tr || ensureTrack(id, p), f, v)) newKey = true;
@@ -386,7 +398,7 @@ export function duplicateSelection() {
       if (map[tr.nodeId]) {
         state.project.tracks.push({
           id: uid('t'), nodeId: map[tr.nodeId], prop: tr.prop,
-          keys: tr.keys.map((k) => ({ ...k })),
+          keys: tr.keys.map((k) => ({ ...k, v: Array.isArray(k.v) ? [...k.v] : k.v })),
         });
       }
     }

@@ -86,6 +86,25 @@ const result = await page.evaluate(async () => {
   if (after >= before) throw new Error('undo không giảm node');
   A.redo?.();
 
+  // 4b. Morph hình dạng: key pose ở f0, dịch đỉnh, key ở f30, kiểm tra nội suy
+  const vnode = A.addTraceResult(res, { split: false, seal: true, name: 'MorphTest' });
+  A.state.autokey = true;
+  A.setFrame(0);
+  if (!A.writeMorphKey(vnode.id)) throw new Error('writeMorphKey f0 thất bại');
+  const flat0 = A.geometryFlat(A.findNode(vnode.id));
+  A.setFrame(30);
+  A.applyMorphFlat(A.findNode(vnode.id), flat0.map((c, i) => (i % 2 === 0 ? c + 40 : c)));
+  A.writeMorphKey(vnode.id);
+  A.setFrame(15);
+  const mid = A.geometryFlat(A.findNode(vnode.id));
+  if (Math.abs(mid[0] - (flat0[0] + 20)) > 0.5) {
+    throw new Error('morph nội suy sai: ' + mid[0] + ' vs ' + (flat0[0] + 20));
+  }
+  const animMorph = A.animatedSVGString();
+  if (!animMorph.includes('<animate attributeName="d"')) {
+    throw new Error('SVG động thiếu SMIL morph');
+  }
+
   // 5. Xuất video: WebM ngắn (0.8s) + chuỗi PNG zip
   A.state.project.durFrames = 24;
   const webm = await A.recordWebMBlob({});

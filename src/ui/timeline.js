@@ -9,6 +9,7 @@ import { togglePlay, pauseAnim } from '../core/player.js';
 const TL_LABEL_W = 170;
 const TL_PROP_LABELS = {
   x: 'X', y: 'Y', rotation: 'Xoay', scaleX: 'Tỉ lệ X', scaleY: 'Tỉ lệ Y', opacity: 'Mờ',
+  w: 'Rộng', h: 'Cao', morph: 'Hình dạng',
 };
 let tlScroll, tlPpf = 8, tlKeyDrag = null, tlScrub = null, tlZoomExp = 0;
 

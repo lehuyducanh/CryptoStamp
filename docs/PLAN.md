@@ -106,6 +106,23 @@ pose-to-pose.
 - Undo dạng snapshot JSON — đơn giản, đúng; tốn RAM nếu asset ảnh lớn
   (giới hạn 80 bước).
 
+## 4b. Nâng cấp v2: morph hình dạng + CLI cho agent
+
+- **Morph**: track `morph` với giá trị = mảng tọa độ phẳng toàn bộ paths;
+  nội suy từng đỉnh với easing, yêu cầu cùng topology (validate ở CLI, còn
+  công cụ ✎ Sửa điểm trên UI không bao giờ đổi topology nên luôn hợp lệ).
+  Điểm M và điểm cuối path kín được "hàn" (weld) khi kéo để không rách mối nối.
+  Đánh đổi: không hỗ trợ thêm/xóa đỉnh giữa hai pose (re-topology là bài toán
+  matching phức tạp — roadmap).
+- **w/h keyframe**: kích thước shape/ảnh thành thuộc tính animate được;
+  xuất SVG động qua SMIL (rect: width/height; ellipse: cx/cy/rx/ry dẫn xuất).
+- **CLI (`bin/vecmotion.mjs`)**: new/info/edit/vectorize/render — engine ops
+  JSON thuần (`src/cli/ops.js`), PNG decoder tự viết trên node:zlib
+  (`src/cli/png.js`) để vectorize headless, render SVG thuần và PNG qua
+  Chromium (playwright-core, optional). Lý do tách ops engine khỏi store
+  trình duyệt: CLI không cần selection/undo/event, và giữ core thuần giúp
+  test bằng Node không cần DOM.
+
 ## 5. Roadmap sau v1
 
 IK 2 khớp · onion skin · path morphing · xuất Lottie JSON · render video

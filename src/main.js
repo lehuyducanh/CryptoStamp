@@ -3,8 +3,9 @@
 import {
   state, emit, newProject, loadAutosave, setTool, setSelection, setFrame,
   setProps, findNode, makeNode, addNode, deleteNodes, groupSelection,
-  duplicateSelection, undo, redo, snapshot,
+  duplicateSelection, undo, redo, snapshot, writeMorphKey,
 } from './core/state.js';
+import { geometryFlat, applyMorphFlat } from './core/eval.js';
 import { togglePlay } from './core/player.js';
 import { initCanvas } from './ui/canvas.js';
 import { initLayers } from './ui/layers.js';
@@ -44,6 +45,7 @@ function boot() {
     AI_PROVIDERS, loadImage, imageToImageData, vectorizeImageData,
     addTraceResult, projectSVG, animatedSVGString,
     recordWebMBlob, recordPNGZipBlob,
+    writeMorphKey, geometryFlat, applyMorphFlat,
   };
 }
 
@@ -69,6 +71,7 @@ function onKeyDown(e) {
     case 'v': case 'V': setTool('select'); break;
     case 'r': case 'R': setTool('rect'); break;
     case 'e': case 'E': setTool('ellipse'); break;
+    case 'a': case 'A': setTool('points'); break;
     case 'Delete': case 'Backspace':
       if (!deleteSelectedTimelineKey()) deleteNodes([...state.selection]);
       break;

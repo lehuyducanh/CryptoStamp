@@ -35,6 +35,11 @@ node tests/run.js   # unit tests cho core thuần (mat, anim, quantize, trace, s
 4. **Animate**:
    - Bật **● Ghi key** (auto-key) rồi kéo/xoay đối tượng ở các frame khác nhau,
      hoặc bấm nút **◆** cạnh từng thuộc tính trong Thuộc tính.
+   - **Morph hình dạng**: chọn node vector → công cụ **✎ Sửa điểm (A)** → kéo
+     các đỉnh path. Với ● Ghi key bật, mỗi lần kéo tự ghi keyframe "Hình dạng";
+     hình sẽ biến dạng mượt giữa các pose (nội suy từng đỉnh, cùng topology).
+   - **Rộng/Cao** của hình chữ nhật/elip/ảnh cũng keyframe được (◆ trong
+     Thuộc tính) — phóng to thu nhỏ theo kích thước thật.
    - Kéo keyframe trên timeline để đổi thời điểm; chọn key rồi đổi **Easing**.
    - Space phát/dừng; kéo thước thời gian để tua.
 5. **Xuất**:
@@ -76,11 +81,29 @@ Vì sao không xuất SVG động cho phim dài? File sẽ phình theo số fram
 (5 phút ≈ hàng chục MB) và không đưa vào phần mềm dựng phim được — SVG động
 chỉ hợp banner/loop ngắn. WebM/PNG là định dạng đúng cho phim.
 
+## CLI cho AI agent (headless)
+
+Toàn bộ hệ thống dùng được **không cần trình duyệt** qua `bin/vecmotion.mjs` —
+thiết kế cho AI agent: input/output đều là JSON.
+
+```bash
+vecmotion new -o p.json --duration 5          # tạo project
+vecmotion edit p.json --ops ops.json          # dựng scene + keyframe (kể cả morph)
+vecmotion vectorize img.png --add p.json --split   # PNG → vector, headless
+vecmotion info p.json                         # đọc cấu trúc
+vecmotion render p.json -o frames/ --format png    # render (PNG cần Chromium)
+vecmotion render p.json --animated-svg -o anim.svg
+```
+
+Schema ops (addShape, key, **poseKey** morph, parent/rig, setPivot…) và ví dụ
+trọn vẹn: xem **`docs/CLI.md`**.
+
 ## Phím tắt
 
 | Phím | Chức năng |
 |---|---|
 | V / R / E | Chọn / vẽ Chữ nhật / vẽ Elip |
+| A | ✎ Sửa điểm hình dạng (morph) |
 | Space | Phát / dừng |
 | Ctrl+Z / Ctrl+Shift+Z | Hoàn tác / làm lại |
 | Ctrl+G | Nhóm | 
@@ -108,5 +131,9 @@ chỉ hợp banner/loop ngắn. WebM/PNG là định dạng đúng cho phim.
 - Vector hóa hợp nhất với ảnh **flat/AI-style**; ảnh chụp thật sẽ ra rất nhiều
   mảnh (bật gợi ý "flat vector" khi tạo ảnh).
 - Rig là **FK thuần** (chưa có IK, chưa có mesh deformation).
-- Animate được transform + opacity (chưa morph path).
-- Roadmap: IK 2 khớp, onion skin, xuất Lottie/WebM, curve editor.
+- Morph yêu cầu **cùng topology** giữa các pose (cùng số path, cùng chuỗi lệnh
+  M/L/C/Z) — sửa bằng ✎ luôn thỏa; pose từ CLI được validate.
+- Morph trong SVG động xuất bằng SMIL (nội suy linear giữa các key); render
+  Video/PNG thì đầy đủ easing.
+- Roadmap: IK 2 khớp, onion skin, xuất Lottie/WebM, curve editor, thêm/xóa
+  đỉnh khi morph (re-topology).

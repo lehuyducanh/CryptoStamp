@@ -13,6 +13,9 @@ import {
   undo, setPivot, groupSelection, setSelection,
 } from '../src/core/state.js';
 import { crc32, zipStore } from '../src/export/zip.js';
+import { parsePathD, buildPathD, pathAnchorIdx, moveAnchor } from '../src/vector/path.js';
+import { geometryFlat, applyMorphFlat, evalProjectAtFrame } from '../src/core/eval.js';
+import { opsNewProject, applyOps } from '../src/cli/ops.js';
 
 let pass = 0, fail = 0;
 function ok(cond, msg) {
@@ -177,6 +180,137 @@ function close(a, b, eps, msg) { ok(Math.abs(a - b) <= (eps ?? 1e-6), `${msg} ($
   const back = JSON.parse(json);
   ok(back.nodes.length === state.project.nodes.length
     && back.tracks.length === state.project.tracks.length, 'serialize roundtrip');
+}
+
+// ---- path parse/build/moveAnchor ----
+{
+  const g = parsePathD('M0 0L10 0L10 10L0 10Z');
+  ok(g.cmds === 'MLLLZ' && g.pts.length === 8, 'parsePathD polygon');
+  ok(buildPathD(g.cmds, g.pts) === 'M0 0L10 0L10 10L0 10Z', 'buildPathD roundtrip');
+  ok(pathAnchorIdx(g.cmds).join(',') === '0,2,4,6', 'pathAnchorIdx polygon');
+
+  const c = parsePathD('M0 0C1 0 9 0 10 0C10 1 10 9 10 10C9 10 1 10 0 10C0 9 0 1 0 0Z');
+  ok(c.cmds === 'MCCCCZ' && c.pts.length === 26, 'parsePathD bezier kín');
+
+  // Lặp ngầm: M 0 0 5 5 → M rồi L
+  const imp = parsePathD('M0 0 5 5L9 9Z');
+  ok(imp.cmds === 'MLLZ', 'parsePathD lặp ngầm M→L');
+
+  let threw = false;
+  try { parsePathD('M0 0q1 1 2 2'); } catch { threw = true; }
+  ok(threw, 'parsePathD từ chối lệnh tương đối/không hỗ trợ');
+
+  // moveAnchor: kéo góc polygon
+  const g2 = parsePathD('M0 0L10 0L10 10L0 10Z');
+  moveAnchor(g2.cmds, g2.pts, 2, 5, -3); // góc (10,0)
+  ok(g2.pts[2] === 15 && g2.pts[3] === -3, 'moveAnchor dịch đúng đỉnh');
+  ok(g2.pts[0] === 0 && g2.pts[4] === 10, 'moveAnchor không đụng đỉnh khác');
+
+  // moveAnchor weld: điểm M trùng điểm cuối path kín phải dịch cùng nhau
+  const g3 = parsePathD('M0 0C1 0 9 0 10 0C10 1 10 9 10 10C9 10 1 10 0 10C0 9 0 1 0 0Z');
+  moveAnchor(g3.cmds, g3.pts, 0, 4, 4); // kéo điểm M(0,0)
+  ok(g3.pts[0] === 4 && g3.pts[1] === 4, 'weld: điểm M dịch');
+  ok(g3.pts[24] === 4 && g3.pts[25] === 4, 'weld: điểm cuối trùng dịch theo (không rách mối hàn)');
+  ok(g3.pts[2] === 5 && g3.pts[22] === 4, 'weld: control kề dịch theo');
+}
+
+// ---- morph eval ----
+{
+  const proj = {
+    nodes: [{
+      id: 'v1', type: 'vector', x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
+      opacity: 1, pivotX: 0, pivotY: 0,
+      paths: [{ d: 'M0 0L10 0L10 10L0 10Z', fill: '#f00' }],
+    }],
+    tracks: [],
+  };
+  const n = proj.nodes[0];
+  const flat0 = geometryFlat(n);
+  ok(flat0.length === 8, 'geometryFlat 8 tọa độ');
+  const flat1 = flat0.map((v, i) => (i % 2 === 0 ? v + 20 : v)); // dịch x +20
+  proj.tracks.push({
+    id: 't1', nodeId: 'v1', prop: 'morph',
+    keys: [{ t: 0, v: flat0, e: 'linear' }, { t: 10, v: flat1, e: 'linear' }],
+  });
+  evalProjectAtFrame(proj, 5);
+  const mid = geometryFlat(n);
+  close(mid[0], 10, 0.01, 'morph nội suy giữa: x0 = +10');
+  close(mid[1], 0, 0.01, 'morph nội suy giữa: y giữ nguyên');
+  evalProjectAtFrame(proj, 10);
+  close(geometryFlat(n)[0], 20, 0.01, 'morph tại key cuối');
+  // applyMorphFlat trực tiếp
+  applyMorphFlat(n, flat0);
+  ok(n.paths[0].d === 'M0 0L10 0L10 10L0 10Z', 'applyMorphFlat khôi phục d gốc');
+}
+
+// ---- CLI ops engine ----
+{
+  const p = opsNewProject({ width: 800, height: 600, fps: 30, durationS: 2 });
+  ok(p.durFrames === 60, 'opsNewProject durFrames');
+  const r = applyOps(p, [
+    { op: 'addShape', shape: 'rect', w: 100, h: 50, fill: '#ff0000', x: 10, y: 20, name: 'Thân', ref: 'body' },
+    { op: 'addShape', shape: 'ellipse', w: 40, h: 40, name: 'Đầu', ref: 'head' },
+    { op: 'addGroup', name: 'Nhân vật', children: ['@body', '@head'], ref: 'char' },
+    { op: 'setPivot', node: '@char', px: 60, py: 45 },
+    { op: 'key', node: '@char', prop: 'rotation', frame: 0, value: 0, ease: 'easeInOut' },
+    { op: 'key', node: '@char', prop: 'rotation', frame: 30, value: 90 },
+    { op: 'key', node: '@body', prop: 'w', frame: 0, value: 100 },
+    { op: 'key', node: '@body', prop: 'w', frame: 30, value: 200, ease: 'linear' },
+    { op: 'addVector', paths: [{ d: 'M0 0L20 0L20 20L0 20Z', fill: '#0f0' }], name: 'Lá', ref: 'leaf' },
+    { op: 'poseKey', node: '@leaf', frame: 0 },
+    { op: 'poseKey', node: '@leaf', frame: 20, paths: ['M0 -5L25 0L20 25L0 20Z'] },
+  ]);
+  ok(Object.keys(r.created).length === 4, 'ops: 4 ref được tạo');
+  ok(p.nodes.length === 2 && p.nodes[0].type === 'group', 'ops: group chứa 2 con, vector ở root');
+  ok(p.nodes[0].children.length === 2, 'ops: children đúng');
+  ok(p.tracks.length === 3, 'ops: 3 track (rotation, w, morph)');
+  evalProjectAtFrame(p, 15);
+  const body = p.nodes[0].children[0];
+  close(body.w, 150, 0.01, 'ops: track w nội suy linear giữa');
+  // poseKey sai topology phải báo lỗi (@ref chỉ sống trong 1 lần applyOps → dùng id thật)
+  let threw = false;
+  try { applyOps(p, [{ op: 'poseKey', node: r.created.leaf, frame: 30, paths: ['M0 0L5 5Z'] }]); }
+  catch (e) { threw = /topology|lệnh/.test(e.message); }
+  ok(threw, 'ops: poseKey topology sai bị từ chối');
+  // JSON roundtrip với morph key mảng
+  const back = JSON.parse(JSON.stringify(p));
+  ok(Array.isArray(back.tracks.find((t) => t.prop === 'morph').keys[0].v), 'ops: morph key serialize được');
+}
+
+// ---- PNG decoder (tự dựng PNG hợp lệ bằng zlib + crc32) ----
+{
+  const zlib = await import('node:zlib');
+  const W = 3, H = 2;
+  // pixel RGBA: đỏ, lục, lam / trắng, đen, trong suốt
+  const px = [
+    [255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255],
+    [255, 255, 255, 255], [0, 0, 0, 255], [0, 0, 0, 0],
+  ];
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    rows.push(0); // filter None
+    for (let x = 0; x < W; x++) rows.push(...px[y * W + x]);
+  }
+  const idat = zlib.deflateSync(Buffer.from(rows));
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4);
+  ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
+  const png = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0)),
+  ]);
+  const { decodePNG } = await import('../src/cli/png.js');
+  const img = decodePNG(png);
+  ok(img.width === 3 && img.height === 2, 'decodePNG kích thước');
+  ok(img.data[0] === 255 && img.data[1] === 0, 'decodePNG pixel đỏ');
+  ok(img.data[4 * 4 + 0] === 0 && img.data[4 * 4 + 3] === 255, 'decodePNG pixel đen');
+  ok(img.data[5 * 4 + 3] === 0, 'decodePNG pixel trong suốt');
 }
 
 // ---- zip / crc32 ----
