@@ -1,0 +1,16 @@
+{
+  "name": "vecmotion-studio",
+  "version": "1.0.0",
+  "description": "Ứng dụng motion/hoạt hình 2D: AI tạo element → vector hóa → rig → keyframe → xuất SVG động",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node tests/run.js",
+    "build": "node tools/build.js",
+    "smoke": "node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.45.0"
+  },
+  "license": "MIT"
+}
