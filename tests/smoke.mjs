@@ -86,6 +86,17 @@ const result = await page.evaluate(async () => {
   if (after >= before) throw new Error('undo không giảm node');
   A.redo?.();
 
+  // 4a. Auto-rig robot: tách mảnh (islands) → nhóm Đầu/Thân/Tay/Chân + pivot
+  const rigNode = A.addTraceResult(res, { split: true, seal: true, name: 'RobotRig' });
+  if (rigNode.type !== 'group') throw new Error('cần group để auto-rig');
+  const rig = A.autoRigGroup(rigNode.id);
+  if (!rig) throw new Error('auto-rig robot thất bại');
+  if (rig.root !== 'Thân') throw new Error('gốc rig phải là Thân, được: ' + rig.root);
+  if (!rig.zones.includes('Đầu')) throw new Error('rig thiếu Đầu: ' + rig.zones.join(','));
+  const rigRoot = A.findNode(rigNode.id).children[0];
+  const rigLimbs = rigRoot.children.filter((c) => c.type === 'group').length;
+  if (rigLimbs < 2) throw new Error('rig quá ít chi: ' + rigLimbs);
+
   // 4b. Morph hình dạng: key pose ở f0, dịch đỉnh, key ở f30, kiểm tra nội suy
   const vnode = A.addTraceResult(res, { split: false, seal: true, name: 'MorphTest' });
   A.state.autokey = true;
@@ -122,10 +133,12 @@ const result = await page.evaluate(async () => {
     nodes: A.state.project.nodes.length,
     tracks: A.state.project.tracks.length,
     pieces: res.items.length,
+    rigZones: rig.zones,
     svgLen: svg.length,
     animLen: anim.length,
     webmSize: webm.size,
     zipB64,
+    robotB64: url.split(',')[1], // PNG robot cho e2e CLI auto-rig
   };
 });
 
@@ -141,6 +154,26 @@ const result = await page.evaluate(async () => {
   if (!check.startsWith('6 None')) throw new Error('ZIP không hợp lệ: ' + check);
   delete result.zipB64;
   result.zipFrames = 6;
+}
+
+// E2E CLI: vectorize --auto-rig trên PNG robot do mock provider tạo
+{
+  const { writeFile, mkdtemp } = await import('node:fs/promises');
+  const { execFileSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const dir = await mkdtemp(join(tmpdir(), 'vm-cli-'));
+  const pngPath = join(dir, 'robot.png');
+  const projPath = join(dir, 'p.json');
+  await writeFile(pngPath, Buffer.from(result.robotB64, 'base64'));
+  delete result.robotB64;
+  const bin = join(root, 'bin', 'vecmotion.mjs');
+  execFileSync('node', [bin, 'new', '-o', projPath]);
+  const vout = JSON.parse(execFileSync('node',
+    [bin, 'vectorize', pngPath, '--colors', '6', '--add', projPath, '--auto-rig', '--name', 'Robot']).toString());
+  if (!vout.ok || !vout.rig?.includes('Thân')) {
+    throw new Error('CLI auto-rig thất bại: ' + JSON.stringify(vout));
+  }
+  result.cliRig = vout.rig;
 }
 
 await page.waitForTimeout(300);

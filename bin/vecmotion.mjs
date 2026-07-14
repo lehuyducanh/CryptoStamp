@@ -19,7 +19,7 @@ const USAGE = `VecMotion CLI — công cụ hoạt hình vector cho AI agent
   vecmotion edit project.json --ops ops.json|-   [-o out.json]
   vecmotion vectorize input.png [--colors 8] [--detail 1.5] [--size 256]
             [--no-smooth] [--keep-bg] [-o trace.json]
-            [--add project.json --name X [--split] [--x N --y N --scale S]]
+            [--add project.json --name X [--split] [--auto-rig] [--x N --y N --scale S]]
   vecmotion render project.json --frame N -o frame.svg
   vecmotion render project.json -o outdir/ [--format svg|png] [--from F] [--to F] [--step 1]
   vecmotion render project.json --animated-svg -o anim.svg
@@ -113,15 +113,22 @@ function cmdVectorize(args) {
   });
   if (args.add) {
     const p = loadProject(args.add);
-    const r = applyOps(p, [{
+    const wantRig = !!args['auto-rig'];
+    const ops = [{
       op: 'addTraced', trace: res, ref: 'traced',
-      split: !!args.split, seal: !args['no-seal'], name: args.name || 'Vector',
+      split: !!args.split || wantRig, seal: !args['no-seal'], name: args.name || 'Vector',
       x: args.x != null ? +args.x : undefined,
       y: args.y != null ? +args.y : undefined,
       scale: args.scale != null ? +args.scale : undefined,
-    }]);
+    }];
+    if (wantRig) ops.push({ op: 'autoRig', node: '@traced', ref: 'rig' });
+    const r = applyOps(p, ops);
     saveProject(args.add, p);
-    out({ ok: true, file: args.add, nodeId: r.created.traced, pieces: res.items.length, traceSize: [res.w, res.h] });
+    out({
+      ok: true, file: args.add, nodeId: r.created.traced,
+      pieces: res.items.length, traceSize: [res.w, res.h],
+      ...(wantRig ? { rig: r.created.rig.split('|') } : {}),
+    });
   } else {
     const json = JSON.stringify(res);
     if (args.o) { writeFileSync(args.o, json); out({ ok: true, file: args.o, pieces: res.items.length }); }

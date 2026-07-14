@@ -16,6 +16,8 @@ import { crc32, zipStore } from '../src/export/zip.js';
 import { parsePathD, buildPathD, pathAnchorIdx, moveAnchor } from '../src/vector/path.js';
 import { geometryFlat, applyMorphFlat, evalProjectAtFrame } from '../src/core/eval.js';
 import { opsNewProject, applyOps } from '../src/cli/ops.js';
+import { splitIslandGroups, vectorizeImageData as vecImg2 } from '../src/vector/vectorize.js';
+import { planRig, autoRigApply } from '../src/rig/autorig.js';
 
 let pass = 0, fail = 0;
 function ok(cond, msg) {
@@ -275,6 +277,80 @@ function close(a, b, eps, msg) { ok(Math.abs(a - b) <= (eps ?? 1e-6), `${msg} ($
   // JSON roundtrip với morph key mảng
   const back = JSON.parse(JSON.stringify(p));
   ok(Array.isArray(back.tracks.find((t) => t.prop === 'morph').keys[0].v), 'ops: morph key serialize được');
+}
+
+// ---- tách đảo (islands) ----
+{
+  const sq = (x, y, s) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
+  // 2 hình vuông rời cùng màu → 2 đảo
+  const g2 = splitIslandGroups([sq(0, 0, 4), sq(10, 0, 4)]);
+  ok(g2.length === 2, 'islands: 2 khối rời → 2 đảo');
+  // vuông + lỗ bên trong (ngược chiều) → 1 đảo 2 loop
+  const outer = sq(0, 0, 10);
+  const hole = sq(3, 3, 3).reverse();
+  const g1 = splitIslandGroups([outer, hole]);
+  ok(g1.length === 1 && g1[0].loops.length === 2, 'islands: lỗ gắn vào đảo chứa nó');
+
+  // Ảnh 12x8: hai khối đỏ rời trên nền lam → vectorize (islands mặc định) ra 2 mảnh
+  const w = 12, h = 8;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const x = i % w, y = (i / w) | 0;
+    const red = y >= 2 && y < 6 && ((x >= 1 && x < 4) || (x >= 8 && x < 11));
+    data[i * 4] = red ? 220 : 20; data[i * 4 + 1] = 30;
+    data[i * 4 + 2] = red ? 30 : 220; data[i * 4 + 3] = 255;
+  }
+  const res2 = vecImg2({ data, width: w, height: h },
+    { colors: 2, dropBg: true, smooth: false, minArea: 1 });
+  ok(res2.items.length === 2, 'vectorize islands: 2 khối cùng màu → 2 mảnh riêng');
+}
+
+// ---- auto-rig ----
+{
+  // Nhân vật giả: đầu / thân / 2 tay / 2 chân (bbox trong không gian cha)
+  const pieces = [
+    { x: 35, y: 0, w: 30, h: 28 },   // đầu
+    { x: 30, y: 28, w: 40, h: 42 },  // thân
+    { x: 0, y: 30, w: 28, h: 30 },   // tay trái
+    { x: 72, y: 30, w: 28, h: 30 },  // tay phải
+    { x: 32, y: 70, w: 16, h: 30 },  // chân trái
+    { x: 52, y: 70, w: 16, h: 30 },  // chân phải
+  ];
+  const plan = planRig(pieces);
+  ok(plan !== null, 'planRig nhận diện được');
+  ok(plan.root === 'torso', 'planRig: thân là gốc');
+  const byZone = Object.fromEntries(plan.zones.map((z) => [z.zone, z]));
+  ok(byZone.head?.indices.includes(0), 'planRig: đầu đúng mảnh');
+  ok(byZone.armL?.indices.includes(2) && byZone.armR?.indices.includes(3), 'planRig: 2 tay đúng bên');
+  ok(byZone.legL?.indices.includes(4) && byZone.legR?.indices.includes(5), 'planRig: 2 chân đúng bên');
+  close(byZone.head.pivot.y, 25.2, 1, 'planRig: pivot đầu tại cổ');
+  ok(byZone.legL.pivot.y === 70, 'planRig: pivot chân tại hông');
+
+  // autoRigApply dựng cây FK
+  const mk = (bbox, name) => ({
+    id: name, name, type: 'vector', x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
+    opacity: 1, pivotX: 0, pivotY: 0,
+    paths: [{ d: `M${bbox.x} ${bbox.y}L${bbox.x + bbox.w} ${bbox.y}L${bbox.x + bbox.w} ${bbox.y + bbox.h}L${bbox.x} ${bbox.y + bbox.h}Z`, fill: '#abc' }],
+    bbox,
+  });
+  const group = {
+    id: 'g', name: 'NV', type: 'group', x: 0, y: 0, rotation: 0,
+    scaleX: 1, scaleY: 1, opacity: 1, pivotX: 0, pivotY: 0,
+    children: pieces.map((b, i) => mk(b, 'p' + i)),
+  };
+  let gi = 0;
+  const r = autoRigApply(group, (name) => ({
+    id: 'zg' + gi++, name, type: 'group', x: 0, y: 0, rotation: 0,
+    scaleX: 1, scaleY: 1, opacity: 1, pivotX: 0, pivotY: 0, children: [],
+  }));
+  ok(r !== null && r.root === 'Thân', 'autoRigApply: gốc là Thân');
+  ok(group.children.length === 1 && group.children[0].name === 'Thân', 'autoRigApply: 1 con gốc');
+  const rootG = group.children[0];
+  const subGroups = rootG.children.filter((c) => c.type === 'group');
+  ok(subGroups.length === 5, 'autoRigApply: 5 chi là con của Thân');
+  ok(rootG.children.some((c) => c.id === 'p1'), 'autoRigApply: mảnh thân nằm trong Thân');
+  // đã rig rồi → không rig lại
+  ok(autoRigApply(group, () => ({})) === null, 'autoRigApply: từ chối rig lần 2');
 }
 
 // ---- PNG decoder (tự dựng PNG hợp lệ bằng zlib + crc32) ----

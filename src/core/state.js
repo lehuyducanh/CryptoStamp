@@ -3,7 +3,10 @@
 
 import { sortKeys } from './anim.js';
 import { matIdentity, matMul, matApply, matInvert, nodeMatrix } from './mat.js';
-import { evalProjectAtFrame, geometryFlat } from './eval.js';
+import { evalProjectAtFrame, geometryFlat, nodeLocalBBox } from './eval.js';
+import { autoRigApply } from '../rig/autorig.js';
+
+export { nodeLocalBBox };
 
 // ---- Event bus ----
 const _listeners = {};
@@ -99,28 +102,17 @@ export function worldMatrix(id, includeSelf = true) {
   return m;
 }
 
-// Bbox trong hệ tọa độ cục bộ của node (trước transform của chính nó)
-export function nodeLocalBBox(n) {
-  if (n.type === 'shape' || n.type === 'image') return { x: 0, y: 0, w: n.w || 10, h: n.h || 10 };
-  if (n.type === 'vector') {
-    if (n.paths?.length === 1 && n.paths[0].bbox) return n.paths[0].bbox;
-    return n.bbox || { x: 0, y: 0, w: 10, h: 10 };
-  }
-  if (n.type === 'group') {
-    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity, any = false;
-    for (const c of n.children) {
-      if (c.visible === false) continue;
-      const b = nodeLocalBBox(c), m = nodeMatrix(c);
-      for (const [px, py] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]) {
-        const p = matApply(m, { x: px, y: py });
-        x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y);
-        x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y);
-      }
-      any = true;
-    }
-    return any ? { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } : { x: 0, y: 0, w: 0, h: 0 };
-  }
-  return { x: 0, y: 0, w: 0, h: 0 };
+// Auto-rig một group mảnh phẳng thành cây FK (Thân → Đầu/Tay/Chân) với pivot khớp
+export function autoRigGroup(id) {
+  const g = findNode(id);
+  if (!g || g.type !== 'group') return null;
+  snapshot();
+  const res = autoRigApply(g, (name) => makeNode('group', { name }));
+  if (!res) return null; // không đổi gì — snapshot thừa vô hại (dedupe)
+  state.selection = [g.id];
+  emit('change:structure');
+  emit('change:selection');
+  return res;
 }
 
 // ---- Undo / Redo (snapshot JSON) ----

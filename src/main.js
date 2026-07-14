@@ -3,7 +3,7 @@
 import {
   state, emit, newProject, loadAutosave, setTool, setSelection, setFrame,
   setProps, findNode, makeNode, addNode, deleteNodes, groupSelection,
-  duplicateSelection, undo, redo, snapshot, writeMorphKey,
+  duplicateSelection, undo, redo, snapshot, writeMorphKey, autoRigGroup,
 } from './core/state.js';
 import { geometryFlat, applyMorphFlat } from './core/eval.js';
 import { togglePlay } from './core/player.js';
@@ -45,7 +45,7 @@ function boot() {
     AI_PROVIDERS, loadImage, imageToImageData, vectorizeImageData,
     addTraceResult, projectSVG, animatedSVGString,
     recordWebMBlob, recordPNGZipBlob,
-    writeMorphKey, geometryFlat, applyMorphFlat,
+    writeMorphKey, geometryFlat, applyMorphFlat, autoRigGroup,
   };
 }
 

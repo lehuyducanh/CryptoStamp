@@ -1,7 +1,7 @@
 // Panel AI: tạo ảnh, thư viện asset, modal vector hóa
 
 import {
-  state, on, emit, uid, makeNode, addNode, setSelection,
+  state, on, emit, uid, makeNode, addNode, setSelection, autoRigGroup,
 } from '../core/state.js';
 import { AI_PROVIDERS } from '../ai/providers.js';
 import { vectorizeImageData, imageToImageData } from '../vector/vectorize.js';
@@ -176,6 +176,8 @@ function aiOpenVectorModal(asset) {
       <label class="chk"><input id="vec-dropbg" type="checkbox" checked> Xóa nền</label>
       <label class="chk"><input id="vec-seal" type="checkbox" checked> Bịt khe</label>
       <label class="chk"><input id="vec-split" type="checkbox" checked> Tách mảnh (để rig)</label>
+      <label class="chk" title="Nhân vật đứng thẳng, nhìn chính diện: tự nhóm Đầu/Thân/Tay/Chân, đặt pivot khớp và dựng cây FK">
+        <input id="vec-autorig" type="checkbox" checked> 🦴 Auto-rig nhân vật</label>
     </div>
     <div class="modal-btns">
       <button id="vec-cancel">Hủy</button>
@@ -192,11 +194,18 @@ function aiOpenVectorModal(asset) {
   root.addEventListener('click', (ev) => { if (ev.target === root) aiCloseModal(); });
   qs('#vec-add').addEventListener('click', () => {
     if (!aiLastTrace) return;
-    addTraceResult(aiLastTrace, {
-      split: qs('#vec-split').checked,
-      seal: qs('#vec-seal').checked,
+    const split = qs('#vec-split').checked;
+    const wantRig = qs('#vec-autorig').checked;
+    const n = addTraceResult(aiLastTrace, {
+      split, seal: qs('#vec-seal').checked,
       name: aiCurrentAsset.name || 'Vector',
     });
+    if (n && split && wantRig && n.type === 'group') {
+      const r = autoRigGroup(n.id);
+      showToast(r
+        ? '🦴 Đã auto-rig: ' + r.zones.join(', ') + ' — chỉnh pivot/parent trong Lớp nếu cần'
+        : 'Không nhận diện được bố cục nhân vật (cần nhân vật đứng thẳng, đủ mảnh) — rig thủ công bằng nhóm + pivot', !r);
+    }
     aiCloseModal();
   });
   loadImage(asset.dataURL).then((img) => { aiModalImg = img; aiRunTrace(); });

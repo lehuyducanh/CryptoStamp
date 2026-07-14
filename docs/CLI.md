@@ -56,6 +56,7 @@ echo '[{"op":"key",...}]' | vecmotion edit project.json --ops -
 | `remove` | node | xóa node + track của nó |
 | `key` | node, prop, frame, value, ease | prop: x, y, rotation, scaleX, scaleY, opacity, w, h |
 | `poseKey` | node, frame, paths:[d,…]?, ease | **keyframe hình dạng** node vector; bỏ `paths` = key hình hiện tại; `paths` phải **cùng topology** (cùng số path, cùng chuỗi lệnh M/L/C/Z) với node |
+| `autoRig` | node, ref? | group mảnh phẳng → cây FK Đầu/Thân/Tay/Chân + pivot khớp (nhân vật đứng thẳng chính diện); `ref` nhận danh sách vùng |
 | `removeKey` | node, prop, frame | prop `morph` cho key hình dạng |
 
 Easing: `linear`, `easeIn`, `easeOut`, `easeInOut`, `backOut`, `bounceOut`,
@@ -69,6 +70,11 @@ vecmotion vectorize robot.png --colors 8 --detail 1.5 -o trace.json
 
 # Hoặc thêm thẳng vào project (--split: tách mảnh để rig)
 vecmotion vectorize robot.png --add project.json --name Robot --split
+
+# Một lệnh ra nhân vật đã rig sẵn: tách mảnh + auto-rig FK
+vecmotion vectorize robot.png --add project.json --name Robot --auto-rig
+# → {"ok":true,"nodeId":"n1","rig":["Đầu","Thân","Tay trái","Tay phải","Chân trái","Chân phải"]}
+# Sau đó animate khớp: {"op":"key","node":"<id Tay trái>","prop":"rotation",...}
 ```
 
 Cờ: `--colors 2..16`, `--detail 0.5..4`, `--size 192|256|384` (cỡ trace),
@@ -121,8 +127,10 @@ ffmpeg -framerate 30 -i frames/frame_%05d.png -pix_fmt yuv420p demo.mp4
   của node (đọc file project JSON), chỉ **thay đổi tọa độ**, giữ nguyên chuỗi
   lệnh. `poseKey` không có `paths` sẽ key hình dạng hiện tại — hữu ích làm
   key gốc trước khi biến đổi.
-- **Rig**: `addGroup` với `children` → `setPivot` tại khớp → `key` prop
-  `rotation` trên group. Con xoay theo cha (FK).
+- **Rig**: nhanh nhất là `vectorize --auto-rig` (hoặc op `autoRig` trên group
+  mảnh). Xong chạy `info` để lấy id các group Đầu/Tay/Chân rồi `key` prop
+  `rotation` trên từng khớp. Rig thủ công: `addGroup` với `children` →
+  `setPivot` tại khớp → `key` rotation. Con xoay theo cha (FK).
 - File project là JSON thuần — agent có thể đọc/sửa trực tiếp, nhưng dùng
   `edit --ops` an toàn hơn (validate topology, id, easing).
 - Phim dài: mỗi cảnh một file project, render từng cảnh, ghép bằng

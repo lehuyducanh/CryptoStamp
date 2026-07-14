@@ -28,9 +28,16 @@ node tests/run.js   # unit tests cho core thuần (mat, anim, quantize, trace, s
 2. **Vector hóa**: bấm **✦ Vector** trên asset → chỉnh số màu, chi tiết, xóa
    nền → *Tách mảnh* để mỗi vùng màu thành một node riêng → Thêm vào canvas.
 3. **Rig** (kiểu cutout FK):
-   - Chọn nhiều mảnh (Shift+click) → **Ctrl+G** nhóm thành bộ phận (tay, đầu…).
-   - Trong Thuộc tính → **🎯 Click đặt tâm** để đặt pivot tại khớp.
-   - Kéo node thả **vào giữa** một nhóm trong panel Lớp để parent (con xoay theo cha).
+   - **🦴 Auto-rig**: với nhân vật flat đứng thẳng, tick "Auto-rig nhân vật"
+     ngay trong hộp thoại vector hóa (hoặc nút 🦴 trong Thuộc tính khi chọn
+     group mảnh) — hệ thống tách từng khối liền, tự nhóm **Đầu / Thân /
+     Tay trái / Tay phải / Chân trái / Chân phải**, đặt pivot tại khớp
+     (cổ, vai, hông) và dựng cây FK với Thân là gốc. Đây là rig template
+     theo heuristic vị trí (neo theo mảnh thân lớn nhất) — nhân vật tư thế
+     lạ có thể cần chỉnh lại vài mảnh bằng kéo-thả trong panel Lớp.
+   - Rig thủ công: chọn nhiều mảnh (Shift+click) → **Ctrl+G** nhóm thành bộ
+     phận; **🎯 Click đặt tâm** để đặt pivot tại khớp; kéo node thả **vào
+     giữa** một nhóm trong panel Lớp để parent (con xoay theo cha).
    - ⚠️ Nên rig xong rồi mới animate (reparent không bảo toàn transform thế giới).
 4. **Animate**:
    - Bật **● Ghi key** (auto-key) rồi kéo/xoay đối tượng ở các frame khác nhau,

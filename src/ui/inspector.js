@@ -3,9 +3,10 @@
 import {
   state, on, emit, snapshot, findNode, findParent, setProps, setPivot,
   setSelection, toggleKey, getTrack, nodeLocalBBox, explodeVector, ungroupNode,
-  ANIM_PROPS,
+  autoRigGroup, ANIM_PROPS,
 } from '../core/state.js';
 import { refreshNodeInner } from './canvas.js';
+import { showToast } from './dom.js';
 
 const INS_LABELS = {
   x: 'X', y: 'Y', rotation: 'Xoay °', scaleX: 'Tỉ lệ X', scaleY: 'Tỉ lệ Y', opacity: 'Mờ',
@@ -118,8 +119,12 @@ function insRender() {
     </div>`;
   }
   if (n.type === 'group') {
+    const canRig = n.children.length >= 3 && !n.children.some((c) => c.type === 'group');
     html += `<div class="ins-section">
-      <button class="mini" data-act="ungroup">Rã nhóm</button>
+      <div class="btn-row">
+        ${canRig ? '<button class="mini" data-act="autorig" title="Tự nhóm Đầu/Thân/Tay/Chân, đặt pivot khớp, dựng cây FK (nhân vật đứng thẳng)">🦴 Auto-rig nhân vật</button>' : ''}
+        <button class="mini" data-act="ungroup">Rã nhóm</button>
+      </div>
       <div class="hint">Nhóm = xương (bone) trong rig FK. Kéo node khác thả vào
       nhóm này ở panel Lớp để parent.</div></div>`;
   }
@@ -222,5 +227,12 @@ function insOnClick(ev) {
     }
     case 'explode': explodeVector(id); break;
     case 'ungroup': ungroupNode(id); break;
+    case 'autorig': {
+      const r = autoRigGroup(id);
+      showToast(r
+        ? '🦴 Đã auto-rig: ' + r.zones.join(', ')
+        : 'Không nhận diện được bố cục nhân vật — cần ≥3 mảnh rời, nhân vật đứng thẳng', !r);
+      break;
+    }
   }
 }

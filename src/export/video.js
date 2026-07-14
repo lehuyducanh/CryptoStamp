@@ -48,7 +48,7 @@ export async function recordWebMBlob({ onProgress = () => {} } = {}) {
 
   vidCancel = false;
   await vidDrawFrame(ctx, 0);
-  rec.start(1000);
+  rec.start(250); // chunk ngắn: bớt phụ thuộc flush lúc stop (headless dễ flaky)
   const t0 = performance.now();
   let lastWhole = -1;
   while (!vidCancel) {

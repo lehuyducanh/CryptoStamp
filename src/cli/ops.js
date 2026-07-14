@@ -5,6 +5,7 @@ import { sortKeys } from '../core/anim.js';
 import { nodeMatrix, matMul, matInvert } from '../core/mat.js';
 import { findNodeIn, geometryFlat } from '../core/eval.js';
 import { parsePathD } from '../vector/path.js';
+import { autoRigApply } from '../rig/autorig.js';
 
 const OPS_ANIM = ['x', 'y', 'rotation', 'scaleX', 'scaleY', 'opacity', 'w', 'h'];
 const OPS_EASES = ['linear', 'easeIn', 'easeOut', 'easeInOut', 'backOut', 'bounceOut', 'hold'];
@@ -269,6 +270,14 @@ export function applyOps(project, ops) {
             flat = geometryFlat(n); // key hình dạng hiện tại
           }
           opsUpsertKey(opsEnsureTrack(project, n.id, 'morph'), Math.round(op.frame), flat, op.ease);
+          break;
+        }
+        case 'autoRig': {
+          const n = opsResolve(project, created, op.node);
+          if (n.type !== 'group') throw new Error('autoRig cần node group chứa các mảnh (dùng addTraced với split:true)');
+          const r = autoRigApply(n, (name) => opsMakeNode(project, 'group', { name }));
+          if (!r) throw new Error('Không nhận diện được bố cục nhân vật — cần ≥3 mảnh rời, nhân vật đứng thẳng chính diện');
+          if (op.ref) created[op.ref] = r.zones.join('|');
           break;
         }
         case 'removeKey': {

@@ -123,6 +123,23 @@ pose-to-pose.
   trình duyệt: CLI không cần selection/undo/event, và giữ core thuần giúp
   test bằng Node không cần DOM.
 
+## 4c. Auto-rig nhân vật flat (v2.1)
+
+- **Tách đảo**: mỗi màu giờ tách theo khối liền (outer loop + lỗ bên trong)
+  thay vì gộp một path — điều kiện tiên quyết để rig (hai bàn tay cùng màu
+  không còn dính làm một).
+- **Heuristic template người đứng** (`src/rig/autorig.js`, thuần): seed thân =
+  mảnh lớn nhất ở dải giữa; các mảnh khác phân vùng TƯƠNG ĐỐI với bbox thân
+  (trái/phải mép thân = tay, trên = đầu, dưới = chân) — bền hơn so với chia
+  theo bbox tổng vốn bị phụ kiện nhô cao (ăng-ten, mũ) kéo lệch, đã vấp đúng
+  lỗi này với robot demo và sửa. Pivot: cổ/vai/hông; Thân là gốc FK.
+- **Giới hạn nói thẳng**: đây là rig template theo vị trí, KHÔNG phải nhận
+  diện bộ phận bằng ML — nhân vật nằm/nghiêng/tư thế lạ sẽ phân vùng sai và
+  cần sửa tay (kéo-thả trong panel Lớp). ML pose-estimation là hướng roadmap
+  nếu cần chất lượng cao hơn.
+- Có ở 3 nơi: modal vector hóa (checkbox), Inspector (nút 🦴), CLI
+  (`vectorize --auto-rig`, op `autoRig`).
+
 ## 5. Roadmap sau v1
 
 IK 2 khớp · onion skin · path morphing · xuất Lottie JSON · render video
