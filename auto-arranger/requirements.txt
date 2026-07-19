@@ -1,0 +1,10 @@
+# Bắt buộc
+mido>=1.3
+numpy>=1.24
+
+# Tùy chọn: LLM planner (không có thì tự fallback rule-based)
+anthropic>=0.60
+
+# Tùy chọn khác (không cần cài qua pip):
+# - fluidsynth + soundfont (.sf2): render âm thanh chất lượng cao hơn
+# - ffmpeg: xuất MP3
